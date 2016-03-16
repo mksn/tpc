@@ -20,7 +20,11 @@ enum
   TK_NOT,
   TK_NEQ,
   TK_LEQ,
-  TK_GEQ
+  TK_GEQ,
+  TK_AND,
+  TK_OR,
+  TK_MOD,
+  TK_VAR
 };
 
 char  *token_names[] = {
@@ -38,7 +42,11 @@ char  *token_names[] = {
   "Not",
   "<>",
   "<=",
-  ">="
+  ">=",
+  "And",
+  "Or",
+  "Mod",
+  "Var"
 };
 
 FILE *input;
@@ -76,6 +84,12 @@ int lookup_keyword ()
   if (strcmp (cur_text, "procedure") == 0) return TK_PROCEDURE;
   if (strcmp (cur_text, "begin") == 0) return TK_BEGIN;
   if (strcmp (cur_text, "end") == 0) return TK_END;
+  if (strcmp (cur_text, "nil") == 0) return TK_NIL;
+  if (strcmp (cur_text, "and") == 0) return TK_AND;
+  if (strcmp (cur_text, "or") == 0) return TK_OR;
+  if (strcmp (cur_text, "not") == 0) return TK_NOT;
+  if (strcmp (cur_text, "mod") == 0) return TK_MOD;
+  if (strcmp (cur_text, "var") == 0) return TK_VAR;
   return TK_IDENTIFIER;
 }
 
@@ -266,6 +280,12 @@ void term ()
       case '/':
         printf ("DIV\n");
         break;
+      case TK_MOD:
+        printf ("MOD\n");
+        break;
+      case TK_AND:
+        printf ("AND\n");
+        break;
     }
   }
 }
@@ -294,6 +314,9 @@ void simple_expression ()
       case '-':
         printf ("SUB\n");
         break;
+      case TK_OR:
+        printf ("OR\n");
+        break;
     }
   }
 }
@@ -301,7 +324,7 @@ void simple_expression ()
 void expression ()
 {
   simple_expression ();
-  
+  int op = cur_tok;
   switch (cur_tok)
   {
     case '<':
@@ -311,6 +334,24 @@ void expression ()
     case TK_GEQ:
     case '=':
       simple_expression ();
+  }
+  switch (op)
+  {
+    case '<':
+      printf ("LE\n");
+      break;
+    case '>':
+      printf ("GE\n");
+      break;
+    case TK_NEQ:
+      printf ("NEQ\n");
+      break;
+    case TK_LEQ:
+      printf ("LEQ");
+      break;
+    case TK_GEQ:
+      printf ("GEQ\n");
+      break;
   }
 }
 
@@ -356,8 +397,19 @@ void stmt_list ()
   }
 }
 
+void var_decls ()
+{
+  expect (TK_IDENTIFIER);
+  while (accept (','))
+    expect (TK_IDENTIFIER);
+}
+
 void block ()
 {
+  if (accept (TK_VAR))
+  {
+    var_decls ();
+  }
   expect (TK_BEGIN);
   stmt_list ();
   expect (TK_END);
