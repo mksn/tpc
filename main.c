@@ -55,6 +55,25 @@ char cur_char;
 char cur_text[512];
 int  cur_text_len;
 
+struct sym_var {
+  char *name;
+  char *type;
+  struct sym_var *next;
+};
+
+struct sym_tab {
+  char *name;
+  char *return_type;
+  int  no_args;
+  int  no_vars;
+  struct sym_var *args;
+  struct sym_var *var_offset;
+  struct sym_tab *next;
+};
+
+struct sym_tab *table;
+struct sym_tab *cur_tab;
+struct sym_var *cur_var;
 void expression ();
 
 __attribute__((noreturn)) void die (const char *fmt, ...)
@@ -65,6 +84,119 @@ __attribute__((noreturn)) void die (const char *fmt, ...)
   va_end (ap);
   fprintf (stderr,"\n");
   exit (1);
+}
+
+struct sym_var *find_var (struct sym_tab *tptr,
+                          char *name)
+{
+  struct sym_var *tmp = tptr->args;
+  for (;tmp != NULL; tmp = tmp->next)
+  {
+    if (strcmp (tmp->name, name) == 0)
+      return tmp;
+  }
+  return NULL;
+}
+
+struct sym_tab *find_proc (char *name)
+{
+  struct sym_tab *tmp = table;
+  for (;tmp != NULL; tmp = tmp->next)
+  {
+    if (strcmp (tmp->name, name) == 0)
+      return tmp;
+  }
+  return NULL;
+}
+
+struct sym_tab *new_proc ()
+{
+  struct sym_tab *rc = malloc (sizeof (struct sym_tab));
+  memset (rc, 0, sizeof (struct sym_tab));
+  return rc;
+}
+
+void add_proc (char *name)
+{
+  if (cur_tab != NULL)
+  {
+    cur_tab->next = new_proc ();
+    cur_tab = cur_tab->next;
+  }
+  else
+  {
+    cur_tab = table;
+  }
+
+  cur_var = cur_tab->args;
+  cur_tab->name = name;
+}
+
+struct sym_var *new_var ()
+{
+  struct sym_var *rc = malloc (sizeof (struct sym_var));
+  memset (rc, 0, sizeof (struct sym_var));
+  return rc;
+}
+
+ 
+void _add_var (char *name)
+{
+  if (cur_var != NULL)
+  {
+    cur_var->next = new_var ();
+    cur_var = cur_var->next;
+  }
+  else
+  {
+    cur_tab->args = new_var ();
+    cur_var = cur_tab->args;
+  }
+
+  cur_var->name = name;
+}
+
+void add_arg (char *name) 
+{
+  cur_tab->no_args++;
+  _add_var (name);
+}
+
+void add_var (char *name)
+{
+  _add_var (name);
+  if (cur_tab->var_offset == NULL) 
+  {
+    cur_tab->var_offset = cur_var;
+  }
+}
+
+void print_var (struct sym_var *v)
+{
+  printf ("Name: %s", v->name);
+  if (v->type) 
+  {
+    printf (", type: %s", v->type);
+  }
+  printf ("\n");
+}
+
+void print_proc (struct sym_tab *t)
+{
+  struct sym_var *v = t->args;
+  for (;v != NULL; v = v->next)
+  {
+    print_var (v);
+  }
+  printf ("proc: %s, no_args: %d\n", t->name, t->no_args);
+}
+void print_sym_tab ()
+{
+  struct sym_tab *t = table;
+  for (;t!=NULL; t=t->next) 
+  {
+    print_proc (t);
+  }
 }
 
 char *string_from_token (char *buf, int tkn)
@@ -293,7 +425,7 @@ void term ()
 
 void simple_expression ()
 {
-  int sign;
+  int sign = 0;
   if (cur_tok == '+' || cur_tok == '-')
   {
     sign = cur_tok;
@@ -376,6 +508,8 @@ void stmt ()
   if (cur_tok == TK_IDENTIFIER)
   {
     char *ident = strdup (cur_text);
+    add_var (ident);
+
     next ();
     if (accept (TK_ASSIGN))
     {
@@ -400,8 +534,14 @@ void stmt_list ()
 void var_decls ()
 {
   expect (TK_IDENTIFIER);
+  char *ident = strdup (cur_text);
+  add_var (ident);
   while (accept (','))
+  {
     expect (TK_IDENTIFIER);
+    ident = strdup (cur_text);
+    add_var (ident);
+  }
 }
 
 void block ()
@@ -419,6 +559,10 @@ void procedure (void)
 {
   expect (TK_PROCEDURE);
   expect (TK_IDENTIFIER);
+
+  char *ident = strdup (cur_text);
+  add_proc (ident);
+
   if (accept ('('))
   {
     parameter_list ();
@@ -430,10 +574,14 @@ void procedure (void)
 
 void compile (void)
 {
+  table = malloc (sizeof (struct sym_tab));
+  memset (table, 0, sizeof (struct sym_tab));
+  cur_tab = NULL;
   cur_char = getc (input);
   next ();
   procedure ();
   expect (TK_EOF);
+  print_sym_tab ();
 }
 
 int main(int argc, char **argv)
