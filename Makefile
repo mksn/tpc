@@ -1,6 +1,8 @@
+default: test
+
 tpc: main.c
 	$(CC) -Wall -Wextra -ggdb -o $@ $<
-ifneq ($(UNAME), Darwin)
+
+test: tpc test.p fail.p
 	./tpc test.p
 	./tpc fail.p
-endif
