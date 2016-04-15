@@ -166,8 +166,9 @@ void add_proc (char *name)
   {
     struct sym_tab *scope = new_proc ();
     scope->parent = cur_tab;
-    cur_tab->next = scope;
-    cur_tab = cur_tab->next;
+    scope->next = cur_tab->child;
+    cur_tab->child = scope;
+    cur_tab = scope;
   }
   else
   {
@@ -177,13 +178,6 @@ void add_proc (char *name)
   printf ("Adding proc: %s\n", name);
   cur_var = cur_tab->vars;
   cur_tab->name = name;
-}
-
-void add_func (char *name,
-               char *type)
-{
-  add_proc (name);
-  cur_tab->return_type = type;
 }
 
 void pop_proc ()
@@ -212,6 +206,7 @@ void _add_var (char *name)
     cur_var = cur_tab->vars;
   }
 
+  cur_tab->no_vars++;
   cur_var->name = name;
 }
 
@@ -240,18 +235,18 @@ void print_var (struct sym_var *v)
 void print_proc (struct sym_tab *t)
 {
   struct sym_var *v = t->vars;
-  printf ("[proc: %s, no_vars: %d\n", t->name, t->no_args);
+  printf ("[proc: %s, no_vars: %d, no_args: %d\n", t->name, t->no_vars, t->no_args);
   for (;v != NULL; v = v->next)
   {
     print_var (v);
   }
-  print_proc (t->child);
+  if (t->child)
+    print_proc (t->child);
   printf ("]\n");
 }
 void print_sym_tab ()
 {
   struct sym_tab *t = table;
-  print_proc (t);
   for (;t!=NULL; t=t->next) 
   {
     print_proc (t);
@@ -470,10 +465,15 @@ void factor ()
     if (accept ('('))
     {
       int n = arg_list ();
-      if (find_proc (cur_tab, ident)) {
-        printf ("CALL %s %d\n", ident, n);
-      } else {
+      struct sym_tab *f = find_proc (cur_tab, ident);
+      if (!f) {
         die ("Undeclared function: %s", ident);
+      } else {
+        if (f->no_args != n) {
+          die ("Wrong number of arguments to function: %s", ident);
+        } else {
+          printf ("CALL %s %d\n", ident, n);
+        }
       }
     }
     else
@@ -604,11 +604,16 @@ void procedure_stmt (char *ident)
   {
     n = arg_list ();
   }
-  if (!find_proc (cur_tab, ident))
-  {
-    die ("Undefined procedure: %s", ident);
+  struct sym_tab *p = find_proc (cur_tab, ident);
+  if (!p) {
+    die ("Undeclared procedure: %s", ident);
+  } else {
+    if (p->no_args != n) {
+      die ("Wrong number of arguments to procedure: %s", ident);
+    } else {
+      printf ("PCALL %s %d\n", ident, n);
+    }
   }
-  printf ("PCALL %s %d\n", ident, n);
 }
 
 void stmt ()
@@ -660,7 +665,7 @@ void arg_decls ()
     accept (KW_VAR);
     expect (TK_IDENTIFIER);
     char *name = strdup (command_buffer);
-    add_var (name);
+    add_arg (name);
   } while (accept (','));
   expect (')');
 }
@@ -679,6 +684,7 @@ void fun_decl ()
   expect (';');
   block ();
   expect (';');
+  pop_proc ();
 }
 
 
@@ -692,6 +698,7 @@ void proc_decl ()
   expect (';');
   block ();
   expect (';');
+  pop_proc ();
 }
 
 void block ()
@@ -729,9 +736,10 @@ void mainproc ()
 void program ()
 {
   expect (KW_PROGRAM);
-  expect (TK_IDENTIFIER);  
+  expect (TK_IDENTIFIER);
+  char *ident = strdup (command_buffer);
   printf ("PROG %s\n", command_buffer);
-  add_proc (command_buffer);
+  add_proc (ident);
   expect (';');
   block ();
   expect ('.');
