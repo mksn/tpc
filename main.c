@@ -134,6 +134,7 @@ struct sym_tab *find_proc (struct sym_tab *t,
   struct sym_tab *tmp = t->child;
   for (;tmp != NULL; tmp = tmp->next)
   {
+    printf ("%s == %s\n", tmp->name, name);
     if (strcmp (tmp->name, name) == 0)
       return tmp;
   }
@@ -173,8 +174,16 @@ void add_proc (char *name)
     cur_tab = table;
   }
 
+  printf ("Adding proc: %s\n", name);
   cur_var = cur_tab->vars;
   cur_tab->name = name;
+}
+
+void add_func (char *name,
+               char *type)
+{
+  add_proc (name);
+  cur_tab->return_type = type;
 }
 
 void pop_proc ()
@@ -231,15 +240,18 @@ void print_var (struct sym_var *v)
 void print_proc (struct sym_tab *t)
 {
   struct sym_var *v = t->vars;
+  printf ("[proc: %s, no_vars: %d\n", t->name, t->no_args);
   for (;v != NULL; v = v->next)
   {
     print_var (v);
   }
-  printf ("proc: %s, no>vars: %d\n", t->name, t->no_args);
+  print_proc (t->child);
+  printf ("]\n");
 }
 void print_sym_tab ()
 {
   struct sym_tab *t = table;
+  print_proc (t);
   for (;t!=NULL; t=t->next) 
   {
     print_proc (t);
@@ -329,13 +341,24 @@ int next_tok ()
   if (cur_char == EOF)
     return TK_EOF;
 
-  if (strchr ("();+-*/,=", cur_char))
+  if (strchr ("+-*/=[],;^()", cur_char))
   {
     char rc = cur_char;
     cur_char = get_char (input);
     return rc;
   }
 
+  if (cur_char == '.')
+  {
+    cur_char = get_char (input);
+    if (cur_char == '.')
+    {
+      cur_char = get_char (input);
+      return TK_DOTS;
+    }
+    return '.';    
+  }
+  
   if (cur_char == ':')
   {
     cur_char = get_char (input);
@@ -412,13 +435,6 @@ int accept (int tkn)
   return 0;
 }
 
-
-void parameter_list ()
-{
-  expect (')');
-}
-
-
 int arg_list ()
 {
   int n = 1;
@@ -454,7 +470,11 @@ void factor ()
     if (accept ('('))
     {
       int n = arg_list ();
-      printf ("CALL %s %d\n", ident, n);
+      if (find_proc (cur_tab, ident)) {
+        printf ("CALL %s %d\n", ident, n);
+      } else {
+        die ("Undeclared function: %s", ident);
+      }
     }
     else
     {
@@ -570,6 +590,9 @@ void expression ()
 
 void assign_stmt (char *ident)
 {
+  if (!find_var (cur_tab, ident))
+    die ("Undeclared variable: %s\n", ident);
+
   expression ();
   printf ("STORE %s\n", ident);
 }
@@ -581,6 +604,10 @@ void procedure_stmt (char *ident)
   {
     n = arg_list ();
   }
+  if (!find_proc (cur_tab, ident))
+  {
+    die ("Undefined procedure: %s", ident);
+  }
   printf ("PCALL %s %d\n", ident, n);
 }
 
@@ -589,9 +616,6 @@ void stmt ()
   if (accept (TK_IDENTIFIER))
   {
     char *ident = strdup (command_buffer);
-
-    if (!find_var (cur_tab, ident))
-      die ("Undeclared variable: %s\n", ident);
 
     if (accept (TK_ASSIGN))
     {
@@ -627,33 +651,67 @@ void var_decls ()
   expect (';');
 }
 
+void block ();
+
+void arg_decls ()
+{
+  do 
+  {
+    accept (KW_VAR);
+    expect (TK_IDENTIFIER);
+    char *name = strdup (command_buffer);
+    add_var (name);
+  } while (accept (','));
+  expect (')');
+}
+
+void fun_decl ()
+{
+  expect (TK_IDENTIFIER);
+  char *name = strdup (command_buffer);
+  add_proc (name);
+  expect ('(');
+  arg_decls ();
+  expect (':');
+  expect (TK_IDENTIFIER);
+  char *type = strdup (command_buffer);
+  cur_tab->return_type = type;
+  expect (';');
+  block ();
+  expect (';');
+}
+
+
+void proc_decl ()
+{
+  expect (TK_IDENTIFIER);
+  char *name = strdup (command_buffer);
+  add_proc (name);
+  expect ('(');
+  arg_decls ();
+  expect (';');
+  block ();
+  expect (';');
+}
 
 void block ()
-{
+{  
   if (accept (KW_VAR))
   {
     var_decls ();
   }
+  while (1) {
+    if (accept (KW_FUNCTION)) {
+      fun_decl ();
+    } else if (accept (KW_PROCEDURE)) {
+      proc_decl ();
+    } else {
+      break;
+    }
+  }
   expect (KW_BEGIN);
   stmt_list ();
   expect (KW_END);
-}
-
-void procedure (void)
-{
-  expect (KW_PROCEDURE);
-  expect (TK_IDENTIFIER);
-
-  char *ident = strdup (command_buffer);
-  fprintf (stderr, "Adding procedure %s\n", ident);
-  add_proc (ident);
-
-  if (accept ('('))
-  {
-    parameter_list ();
-  }
-  expect (';');
-  block ();
 }
 
 void var ()
