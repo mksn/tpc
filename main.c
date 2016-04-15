@@ -57,7 +57,7 @@ char cur_text[512];
 char command_buffer[512];
 int  cur_text_len;
 int cur_line;
-int cur_index;
+int cur_col;
 
 void print_sym_tab ();
 /*
@@ -67,7 +67,7 @@ void print_sym_tab ();
 __attribute__((noreturn)) void die (const char *fmt, ...)
 {
   va_list ap;
-  fprintf (stderr, "%s@%d:%d: ", cur_file, cur_line, cur_index);
+  fprintf (stderr, "%s@%d:%d: ", cur_file, cur_line, cur_col);
   va_start (ap, fmt);
   vfprintf (stderr, fmt, ap);
   va_end (ap);
@@ -257,10 +257,10 @@ int get_char (FILE *stream)
 {
   int rc = getc (stream);
   if (rc == '\n') {
-    cur_index = 1;
+    cur_col = 1;
     cur_line++;
   } else {
-    cur_index++;
+    cur_col++;
   }
   return rc;
 }
@@ -736,11 +736,11 @@ void program ()
 
 void compile (void)
 {
-  table = malloc (sizeof (struct sym_tab));
+  table = malloc (sizeof (struct sym_tab);)
   memset (table, 0, sizeof (struct sym_tab));
   cur_tab = NULL;
   cur_line = 1;
-  cur_index = 1;
+  cur_col = 1;
   cur_char = get_char (input);
   next ();
   program ();
