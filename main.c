@@ -17,20 +17,20 @@ enum
   TK_EOF,
 
   KW_AND, KW_ARRAY, KW_BEGIN, KW_CASE, KW_CONST, KW_DIV, KW_DO,
-	KW_DOWNTO, KW_ELSE, KW_END, KW_FILE, KW_FOR, KW_FUNCTION, KW_GOTO,
-	KW_IF, KW_IN, KW_LABEL, KW_MOD, KW_NIL, KW_NOT, KW_OF, KW_OR,
-	KW_PACKED, KW_PROCEDURE, KW_PROGRAM, KW_RECORD, KW_REPEAT, KW_SET,
-	KW_THEN, KW_TO, KW_TYPE, KW_UNTIL, KW_VAR, KW_WHILE, KW_WITH,
+  KW_DOWNTO, KW_ELSE, KW_END, KW_FILE, KW_FOR, KW_FUNCTION, KW_GOTO,
+  KW_IF, KW_IN, KW_LABEL, KW_MOD, KW_NIL, KW_NOT, KW_OF, KW_OR,
+  KW_PACKED, KW_PROCEDURE, KW_PROGRAM, KW_RECORD, KW_REPEAT, KW_SET,
+  KW_THEN, KW_TO, KW_TYPE, KW_UNTIL, KW_VAR, KW_WHILE, KW_WITH,
 
   TK_END
 };
 
 char *keywords[] = {
-	"and", "array", "begin", "case", "const", "div", "do", "downto",
-	"else", "end", "file", "for", "function", "goto", "if", "in", "label",
-	"mod", "nil", "not", "of", "or", "packed", "procedure", "program",
-	"record", "repeat", "set", "then", "to", "type", "until", "var",
-	"while", "with",
+  "and", "array", "begin", "case", "const", "div", "do", "downto",
+  "else", "end", "file", "for", "function", "goto", "if", "in", "label",
+  "mod", "nil", "not", "of", "or", "packed", "procedure", "program",
+  "record", "repeat", "set", "then", "to", "type", "until", "var",
+  "while", "with",
 };
 
 char  *token_names[] = {
@@ -57,6 +57,7 @@ char cur_text[512];
 char command_buffer[512];
 int  cur_text_len;
 int cur_line;
+int cur_index;
 
 void print_sym_tab ();
 /*
@@ -66,7 +67,7 @@ void print_sym_tab ();
 __attribute__((noreturn)) void die (const char *fmt, ...)
 {
   va_list ap;
-  fprintf (stderr, "%s:%d: ", cur_file, cur_line);
+  fprintf (stderr, "%s@%d:%d: ", cur_file, cur_line, cur_index);
   va_start (ap, fmt);
   vfprintf (stderr, fmt, ap);
   va_end (ap);
@@ -79,11 +80,11 @@ __attribute__((noreturn)) void die (const char *fmt, ...)
  * Symbol table handling.
  *
  */
-struct sym_var {
-  char *name;
-  char *type;
-  struct sym_var *next;
-};
+  struct sym_var {
+    char *name;
+    char *type;
+    struct sym_var *next;
+  };
 
 struct sym_tab {
   char *name;
@@ -91,9 +92,9 @@ struct sym_tab {
   int  no_args;
   int  no_vars;
   struct sym_var *vars;
+  struct sym_tab *child;
   struct sym_tab *parent;
   struct sym_tab *next;
-  struct sym_tab *child;
 };
 
 struct sym_tab *table;
@@ -104,23 +105,40 @@ void expression ();
 struct sym_var *find_var (struct sym_tab *tptr,
                           char *name)
 {
-  struct sym_var *tmp = tptr->args;
+  struct sym_var *tmp = tptr->vars;
   for (;tmp != NULL; tmp = tmp->next)
   {
     if (strcmp (tmp->name, name) == 0)
       return tmp;
   }
+  return tptr->parent ? find_var (tptr->parent, name) : NULL;
+}
+
+struct sym_tab *_find_proc (struct sym_tab *t,
+                            char *name)
+{
+  struct sym_tab *tmp = t;
+  for (;tmp != NULL; tmp = tmp->next)
+  {
+    if (strcmp (tmp->name, name) == 0)
+      return tmp;
+  }
+  if (t->parent)
+    return _find_proc (t->parent, name);
   return NULL;
 }
 
-struct sym_tab *find_proc (char *name)
+struct sym_tab *find_proc (struct sym_tab *t,
+                           char *name)
 {
-  struct sym_tab *tmp = table;
+  struct sym_tab *tmp = t->child;
   for (;tmp != NULL; tmp = tmp->next)
   {
     if (strcmp (tmp->name, name) == 0)
       return tmp;
   }
+  if (t->parent != NULL)
+    return find_proc (t->parent, name);
   return NULL;
 }
 
@@ -131,12 +149,23 @@ struct sym_tab *new_proc ()
   return rc;
 }
 
+void add_inner_proc (char *name)
+{
+  struct sym_tab *scope = new_proc ();
+  scope->parent = cur_tab;
+  cur_tab->child = scope;
+  cur_tab = cur_tab->child;
+  cur_var = cur_tab->vars;
+  cur_tab->name = name;
+}
+
 void add_proc (char *name)
 {
   if (cur_tab != NULL)
   {
-    cur_tab->next = new_proc ();
-    cur_tab->next->parent = cur_tab;
+    struct sym_tab *scope = new_proc ();
+    scope->parent = cur_tab;
+    cur_tab->next = scope;
     cur_tab = cur_tab->next;
   }
   else
@@ -144,7 +173,7 @@ void add_proc (char *name)
     cur_tab = table;
   }
 
-  cur_var = cur_tab->args;
+  cur_var = cur_tab->vars;
   cur_tab->name = name;
 }
 
@@ -160,7 +189,7 @@ struct sym_var *new_var ()
   return rc;
 }
 
- 
+
 void _add_var (char *name)
 {
   if (cur_var != NULL)
@@ -170,8 +199,8 @@ void _add_var (char *name)
   }
   else
   {
-    cur_tab->args = new_var ();
-    cur_var = cur_tab->args;
+    cur_tab->vars = new_var ();
+    cur_var = cur_tab->vars;
   }
 
   cur_var->name = name;
@@ -186,10 +215,6 @@ void add_arg (char *name)
 void add_var (char *name)
 {
   _add_var (name);
-  if (cur_tab->var_offset == NULL) 
-  {
-    cur_tab->var_offset = cur_var;
-  }
   fprintf (stderr, "Adding variable %s\n", name);
 }
 
@@ -205,12 +230,12 @@ void print_var (struct sym_var *v)
 
 void print_proc (struct sym_tab *t)
 {
-  struct sym_var *v = t->args;
+  struct sym_var *v = t->vars;
   for (;v != NULL; v = v->next)
   {
     print_var (v);
   }
-  printf ("proc: %s, no_args: %d\n", t->name, t->no_args);
+  printf ("proc: %s, no>vars: %d\n", t->name, t->no_args);
 }
 void print_sym_tab ()
 {
@@ -224,7 +249,12 @@ void print_sym_tab ()
 int get_char (FILE *stream)
 {
   int rc = getc (stream);
-  if (rc == '\n') cur_line++;
+  if (rc == '\n') {
+    cur_index = 1;
+    cur_line++;
+  } else {
+    cur_index++;
+  }
   return rc;
 }
 
@@ -265,7 +295,7 @@ int next_tok ()
   {
     cur_char = get_char (input);
   }
-  
+
   if (isalpha (cur_char))
   { 
     cur_text_len = 0;
@@ -343,7 +373,7 @@ int next_tok ()
     }
     return '>';
   }
-  
+
   die ("next_tok: Unexpected character = %c", cur_char);
 }
 
@@ -484,7 +514,7 @@ void simple_expression ()
   }
   else 
     term();
-    
+
   while (1) 
   {
     if (accept ('-')) {
@@ -562,7 +592,7 @@ void stmt ()
 
     if (!find_var (cur_tab, ident))
       die ("Undeclared variable: %s\n", ident);
-    
+
     if (accept (TK_ASSIGN))
     {
       assign_stmt (ident);
@@ -656,9 +686,9 @@ void compile (void)
   memset (table, 0, sizeof (struct sym_tab));
   cur_tab = NULL;
   cur_line = 1;
+  cur_index = 1;
   cur_char = get_char (input);
   next ();
-  //procedure ();
   program ();
   expect (TK_EOF);
   print_sym_tab ();
