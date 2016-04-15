@@ -4,6 +4,8 @@
 #include <string.h>
 #include <ctype.h>
 
+#include "op-codes.h"
+
 enum
 {
   TK_IDENTIFIER=256,
@@ -50,6 +52,7 @@ char  *token_names[] = {
  *
  */
 FILE *input;
+FILE *output;
 int cur_tok;
 char *cur_file;
 char cur_char;
@@ -76,15 +79,24 @@ __attribute__((noreturn)) void die (const char *fmt, ...)
   exit (1);
 }
 
-/*
+/**
+ * Utilities
+ *
+ */
+void emit (int code)
+{
+  fwrite (&code, sizeof (int), 1, output);
+}
+
+/**
  * Symbol table handling.
  *
  */
-  struct sym_var {
-    char *name;
-    char *type;
-    struct sym_var *next;
-  };
+struct sym_var {
+  char *name;
+  char *type;
+  struct sym_var *next;
+};
 
 struct sym_tab {
   char *name;
@@ -97,21 +109,34 @@ struct sym_tab {
   struct sym_tab *next;
 };
 
+struct var_loc
+{
+  int lvl;
+  int idx;
+  struct sym_var *var;
+};
+  
 struct sym_tab *table;
 struct sym_tab *cur_tab;
 struct sym_var *cur_var;
 void expression ();
 
-struct sym_var *find_var (struct sym_tab *tptr,
-                          char *name)
+struct var_loc find_var (struct sym_tab *tptr,
+                          char *name,
+                          int level)
 {
   struct sym_var *tmp = tptr->vars;
-  for (;tmp != NULL; tmp = tmp->next)
+  int i;
+  for (i=0;tmp != NULL; tmp = tmp->next, i++)
   {
     if (strcmp (tmp->name, name) == 0)
-      return tmp;
+      return (struct var_loc){level, i, tmp};
   }
-  return tptr->parent ? find_var (tptr->parent, name) : NULL;
+  if (tptr->parent) {
+    return find_var (tptr->parent, name, level + 1);
+  } else {
+    die ("Undefined variable %s", name);
+  }
 }
 
 struct sym_tab *_find_proc (struct sym_tab *t,
@@ -134,7 +159,6 @@ struct sym_tab *find_proc (struct sym_tab *t,
   struct sym_tab *tmp = t->child;
   for (;tmp != NULL; tmp = tmp->next)
   {
-    printf ("%s == %s\n", tmp->name, name);
     if (strcmp (tmp->name, name) == 0)
       return tmp;
   }
@@ -449,11 +473,13 @@ void factor ()
 
   if (accept(TK_NUM))
   {
-    printf ("NUMBER %g\n", atof(cur_text));
+    printf ("NUMBER %g\n", atof(command_buffer));
+    emit (OP_NUM);
+    emit (atoi (command_buffer));
   }
   else if (accept (TK_STRING))
   {
-    printf ("STRING %s\n", cur_text);
+    printf ("STRING %s\n", command_buffer);
   }
   else if (accept(KW_NIL))
   {
@@ -461,7 +487,7 @@ void factor ()
   }
   else if (accept (TK_IDENTIFIER))
   {
-    ident = strdup (cur_text);
+    ident = strdup (command_buffer);
     if (accept ('('))
     {
       int n = arg_list ();
@@ -478,7 +504,12 @@ void factor ()
     }
     else
     {
+      struct var_loc v;
       printf ("LOAD %s\n", ident);
+      v = find_var (cur_tab, ident, 0);
+      emit (OP_LD);
+      emit (v.lvl);
+      emit (v.idx);
     }
   }
   else if (accept ('('))
@@ -490,6 +521,7 @@ void factor ()
   {
     factor ();
     printf ("NOT \n");
+    emit (OP_NOT);
   }
   else
     die ("Syntax error! in factor");
@@ -504,18 +536,22 @@ void term ()
     if (accept ('*')) {
       factor();
       printf ("MULT\n");
+      emit (OP_MUL);
     }
     else if (accept ('/')){
       factor ();
       printf ("DIV\n");
+      emit (OP_DIV);
     }
     else if (accept (KW_MOD)) {
       factor ();
       printf ("MOD\n");
+      emit (OP_MOD);
     }
     else if (accept (KW_AND)) {
       factor ();
       printf ("AND\n");
+      emit (OP_AND);
     }
     else
       break;
@@ -531,6 +567,7 @@ void simple_expression ()
   else if (accept ('-')) {
     term ();
     printf ("NEG\n");
+    emit (OP_NEG);
   }
   else 
     term();
@@ -540,14 +577,17 @@ void simple_expression ()
     if (accept ('-')) {
       term();
       printf ("SUB\n");
+      emit (OP_SUB);
     }
     else if (accept ('+')){
       term ();
       printf ("ADD\n");
+      emit (OP_ADD);
     }
     else if (accept (KW_OR)) {
       term ();
       printf ("OR\n");
+      emit (OP_OR);
     }
     else
       break;
@@ -561,27 +601,33 @@ void expression ()
   {
     if (accept ('<')) {
       simple_expression ();
-      printf ("LE\n");
+      printf ("LT\n");
+      emit (OP_LT);
     }
     else if (accept ('>')){
       term ();
-      printf ("GE\n");
+      printf ("GT\n");
+      emit (OP_GT);
     }
     else if (accept (TK_NEQ)) {
       term ();
       printf ("NEQ\n");
+      emit (OP_NEQ);
     }
     else if (accept ('=')) {
       term ();
       printf ("EQ\n");
+      emit (OP_EQ);
     }
     else if (accept (TK_LEQ)) {
       term ();
       printf ("LEQ\n");
+      emit (OP_LEQ);
     }
     else if (accept (TK_GEQ)) {
       term ();
       printf ("GEQ\n");
+      emit (OP_GEQ);
     }
     else
       break;
@@ -590,11 +636,13 @@ void expression ()
 
 void assign_stmt (char *ident)
 {
-  if (!find_var (cur_tab, ident))
-    die ("Undeclared variable: %s\n", ident);
-
+  struct var_loc v;
   expression ();
   printf ("STORE %s\n", ident);
+  v = find_var (cur_tab, ident, 0);
+  emit (OP_ST);
+  emit (v.lvl);
+  emit (v.idx);
 }
 
 void procedure_stmt (char *ident)
@@ -616,6 +664,23 @@ void procedure_stmt (char *ident)
   }
 }
 
+void stmt ();
+void stmt_list ();
+
+void if_stmt ()
+{
+  expression ();
+  expect(KW_THEN);
+  printf ("IF\n");
+  stmt ();
+  if (accept (KW_ELSE))
+  {
+    printf ("ELSE\n");
+    stmt ();
+  }
+  printf ("ENDIF\n");
+}
+
 void stmt ()
 {
   if (accept (TK_IDENTIFIER))
@@ -630,6 +695,15 @@ void stmt ()
     {
       procedure_stmt (ident);
     }
+  }
+  else if (accept (KW_IF))
+  {
+    if_stmt ();
+  }
+  else if (accept (KW_BEGIN))
+  {
+    stmt_list ();
+    expect (KW_END);
   }
 }
 
@@ -682,6 +756,7 @@ void fun_decl ()
   char *type = strdup (command_buffer);
   cur_tab->return_type = type;
   expect (';');
+  add_var (name);
   block ();
   expect (';');
   pop_proc ();
@@ -736,7 +811,7 @@ void program ()
 
 void compile (void)
 {
-  table = malloc (sizeof (struct sym_tab);)
+  table = malloc (sizeof (struct sym_tab));
   memset (table, 0, sizeof (struct sym_tab));
   cur_tab = NULL;
   cur_line = 1;
@@ -750,18 +825,17 @@ void compile (void)
 
 int main(int argc, char **argv)
 {
-  int i;
-  for (i=1;i<argc;i++)
+  if (argc != 3)
+    die ("Nothing to work with, eejit!");
+  input = fopen (argv[1], "r");
+  output = fopen (argv[2], "w");
+  cur_file = strdup (argv[1]);
+  if (input == NULL)
   {
-    input = fopen (argv[i], "r");
-    cur_file = strdup (argv[i]);
-    if (input == NULL)
-    {
-      die ("Can not open file %s", argv[i]);
-    }
-    compile ();
-    free (cur_file);
-    fclose (input);
+    die ("Can not open file %s", cur_file);
   }
+  compile ();
+  free (cur_file);
+  fclose (input);
 }
 
