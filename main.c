@@ -721,18 +721,6 @@ void block ()
   expect (KW_END);
 }
 
-void var ()
-{
-}
-
-void constants ()
-{
-}
-
-void mainproc ()
-{
-}
-
 void program ()
 {
   expect (KW_PROGRAM);
