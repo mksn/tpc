@@ -681,6 +681,56 @@ void if_stmt ()
   printf ("ENDIF\n");
 }
 
+void for_stmt ()
+{
+  stmt ();
+  if (accept (KW_TO))
+  {
+    if (accept (TK_IDENTIFIER))
+    {
+      char *ident = strdup (command_buffer);
+      struct var_loc v = find_var (cur_tab, ident, 0);
+      printf ("LOAD %s\n", v.var->name);
+    }
+    else if (accept (TK_NUM))
+    {
+      char *val = strdup (command_buffer);
+      printf ("NUM %s\n", val);
+    }
+    else
+    {
+      die ("Syntax error: bad for loop [1]");
+    }
+  }
+  else if (accept (KW_DOWNTO))
+  {
+    if (accept (TK_IDENTIFIER))
+    {
+      char *ident = strdup (command_buffer);
+      struct var_loc v = find_var (cur_tab, ident, 0);
+      printf ("LOAD %s\n", v.var->name);
+    }
+    else if (accept (TK_NUM))
+    {
+      char *val = strdup (command_buffer);
+      printf ("NUM %s\n", val);
+    }
+    else
+    {
+      die ("Syntax error: bad for loop [2]");
+    }
+  }
+  expect (KW_DO);
+  stmt ();
+}
+
+void while_stmt ()
+{
+  expression ();
+  expect (KW_DO);
+  stmt ();
+}
+
 void stmt ()
 {
   if (accept (TK_IDENTIFIER))
@@ -704,6 +754,14 @@ void stmt ()
   {
     stmt_list ();
     expect (KW_END);
+  }
+  else if (accept (KW_FOR))
+  {
+    for_stmt ();
+  }
+  else if (accept (KW_WHILE))
+  {
+    while_stmt ();
   }
 }
 

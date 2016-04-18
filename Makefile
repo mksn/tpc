@@ -7,8 +7,8 @@ tpr: run.c
 	$(CC) -Wall -Wextra -ggdb -o $@ $<
 
 test: tpc test.p fail.p
-	./tpc test.p
-	./tpc fail.p
+	./tpc test.p test.out
+	./tpc fail.p fail.out
 
 fib: tpr fib.out
 	./tpr fib.out
