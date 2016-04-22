@@ -115,10 +115,11 @@ struct sym_var {
 };
 
 struct sym_tab {
-  char *name;
-  char *return_type;
-  int  no_args;
-  int  no_vars;
+  char           *name;
+  char           *return_type;
+  int            addr;
+  int            no_args;
+  int            no_vars;
   struct sym_var *vars;
   struct sym_tab *child;
   struct sym_tab *parent;
@@ -131,7 +132,14 @@ struct var_loc
   int idx;
   struct sym_var *var;
 };
-  
+
+struct proc_loc
+{
+  int lvl;
+  int addr;
+  struct sym_tab *proc;
+};
+
 struct sym_tab *table;
 struct sym_tab *cur_tab;
 struct sym_var *cur_var;
@@ -174,6 +182,23 @@ struct sym_tab *_find_proc (struct sym_tab *t,
   return NULL;
 }
 
+struct proc_loc find_proc (struct sym_tab *t,
+                           char *name,
+                           int level)
+{
+  struct sym_tab *tmp = t->child;
+  for (;tmp != NULL; tmp = tmp->next)
+  {
+    if (strcmp (tmp->name, name) == 0)
+      return (struct proc_loc){level, tmp->addr, tmp};
+  }
+  if (t->parent != NULL)
+    return find_proc (t->parent, name, level+1);
+  else
+    die ("Undefined procedure");
+  
+}
+/*
 struct sym_tab *find_proc (struct sym_tab *t,
                            char *name)
 {
@@ -187,6 +212,7 @@ struct sym_tab *find_proc (struct sym_tab *t,
     return find_proc (t->parent, name);
   return NULL;
 }
+*/
 
 struct sym_tab *new_proc ()
 {
@@ -511,21 +537,24 @@ void factor ()
     ident = strdup (command_buffer);
     if (accept ('('))
     {
+      emit (OP_MST);
+      struct proc_loc f = find_proc (cur_tab, ident, 0);
+      emit (f.lvl);
       int n = arg_list ();
-      struct sym_tab *f = find_proc (cur_tab, ident);
-      if (!f) {
-        die ("Undeclared function: %s", ident);
+      
+      if (f.proc->no_args != n) {
+        die ("Wrong number of arguments to function: %s", ident);
       } else {
-        if (f->no_args != n) {
-          die ("Wrong number of arguments to function: %s", ident);
-        } else {
-          printf ("CALL %s %d\n", ident, n);
-        }
+        emit (OP_CUP);
+        emit (f.proc->no_args);
+        emit (f.addr);
+        printf ("CALL %s %d\n", ident, n);
       }
     }
     else
     {
       struct var_loc v;
+      // TODO: It might be a procedure call
       printf ("LOAD %s\n", ident);
       v = find_var (cur_tab, ident, 0);
       emit (OP_LD);
@@ -669,19 +698,23 @@ void assign_stmt (char *ident)
 void procedure_stmt (char *ident)
 {
   int n = 0;
+  emit (OP_MST);
+
+  struct proc_loc p = find_proc (cur_tab, ident, 0);
+  emit (p.lvl);
+
   if (accept ('('))
   {
     n = arg_list ();
   }
-  struct sym_tab *p = find_proc (cur_tab, ident);
-  if (!p) {
-    die ("Undeclared procedure: %s", ident);
+
+  if (p.proc->no_args != n) {
+    die ("Wrong number of arguments to procedure: %s", ident);
   } else {
-    if (p->no_args != n) {
-      die ("Wrong number of arguments to procedure: %s", ident);
-    } else {
-      printf ("PCALL %s %d\n", ident, n);
-    }
+    emit (OP_CUP);
+    emit (p.proc->no_args);
+    emit (p.addr);
+    printf ("PCALL %s %d\n", ident, n);
   }
 }
 
@@ -839,7 +872,7 @@ void fun_decl ()
   cur_tab->return_type = type;
   expect (';');
   add_var (name);
-  block ();
+  cur_tab->addr = block ();
   expect (';');
   emit (OP_RC);
   pop_proc ();
@@ -854,7 +887,7 @@ void proc_decl ()
   expect ('(');
   arg_decls ();
   expect (';');
-  block ();
+  cur_tab->addr = block ();
   expect (';');
   emit (OP_RET);
   pop_proc ();
@@ -883,10 +916,12 @@ int block ()
   }
   expect (KW_BEGIN);
   int start = here ();
+  cur_tab->addr = start;
   emit (OP_ENT);
-  emit (cur_tab->no_vars);
+  emit (cur_tab->no_args+4);
   stmt_list ();
   expect (KW_END);
+  printf ("block: %d\n", start);
   return start;
 }
 
@@ -907,9 +942,9 @@ void program ()
   emit (OP_HLT);
   int start = block ();
   patch (alku, start);
+  emit (OP_RET);
   expect ('.');
   pop_proc ();
-  emit (OP_RET);
 }
 
 void compile (void)

@@ -24,3 +24,5 @@ test.out: test.p tpc
 
 dump: tpd test.out
 	./tpd test.out
+
+tout: tpd tpc tpr

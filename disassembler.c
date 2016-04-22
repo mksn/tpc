@@ -11,35 +11,31 @@ void dump (int *code,
     printf ("%05d: ", i);
     int c = code [i++];
     switch (c) {
-      case OP_MST:
-      {
+      case OP_MST: {
         int level = code [i++];
         printf ("MST %3d\n", level);
-      }
         break;
-      case OP_CUP:
-      {
+      }
+      case OP_CUP: {
         int no_args = code [i++];
         int addr = code [i++];
         printf ("CUP %3d %3d\n", no_args, addr);
-      }
         break;
-      case OP_ENT:
-      {
+      }
+      case OP_ENT: {
         int foo = code [i++];
         printf ("ENT %3d\n", foo);
-      }
         break;
+      }
       case OP_RET:
         printf ("RET\n");
         break;
-      case OP_LD:
-      {
+      case OP_LD: {
         int level = code [i++];
         int addr = code [i++];
         printf ("LD  %3d %3d\n", level, addr);
-      }
         break;
+      }
       case OP_ST:
       {
         int level = code [i++];
@@ -115,7 +111,7 @@ void dump (int *code,
         break;
       case OP_HLT:
         printf ("HLT\n");
-        return;
+        break;
 
     }
   }

@@ -12,10 +12,10 @@ void run (int *code)
 
   while (1)
   {
+    printf ("[sp: %d, mp: %d] ", sp, mp);
     printf ("%3d: ", pc);
     switch (code [pc++]) {
-      case OP_MST:
-      {
+      case OP_MST: {
         int level = code [pc++];
         mem [sp + 0] = 0; // return value
         mem [sp + 1] = mem [mp + 1]; // static link
@@ -23,25 +23,24 @@ void run (int *code)
         mem [sp + 3] = 0; // return addr;
         sp += 4;
         printf ("MST %3d\n", level);
-      }
         break;
-      case OP_CUP:
-      {
+      }
+      case OP_CUP: {
         int no_args = code [pc++];
         int addr = code [pc++];
         mem [sp-no_args-1] = pc;
         mp = sp - no_args - 4;
         pc = addr;
         printf ("CUP %3d %3d\n", no_args, addr);
-      }
         break;
+      }
       case OP_ENT:
       {
         int no_vars = code [pc++];
         sp = mp + no_vars;
         printf ("ENT %3d\n", no_vars);
-      }
         break;
+      }
       case OP_RET:
         sp = mp;
         pc = mem [mp + 3];
@@ -60,16 +59,16 @@ void run (int *code)
         int addr = code [pc++];
         mem [sp++] = mem [mp + addr];
         printf ("LD  %3d %3d\n", level, addr);
-      }
         break;
+      }
       case OP_ST:
       {
         int level = code [pc++];
         int addr = code [pc++];
         mem [mp + addr] = mem [--sp];
         printf ("ST  %3d %3d\n", level, addr);
-      }
         break;
+      }
       case OP_ADD:
         mem [sp - 2] = mem [sp - 2] + mem [sp - 1];
         sp -= 1;
@@ -144,8 +143,8 @@ void run (int *code)
         int addr = code [pc++];
         pc = addr;
         printf ("JMP %3d\n", addr);
-      }
         break;
+      }
       case OP_JZ:
       {
         int addr = code [pc++];
@@ -153,15 +152,15 @@ void run (int *code)
         sp -= 1;
         if (!v) pc = addr;
         printf ("JZ  %3d\n", addr);
-      }
         break;
+      }
       case OP_NUM:
       {
         int no = code [pc++];
         mem [sp++] = no;
         printf ("NUM %3d\n", no);
-      }
         break;
+      }
       case OP_NEG:
         mem [sp - 1] = -mem [sp - 1];
         printf ("NEG\n");
