@@ -9,20 +9,21 @@ tpr: run.c
 tpd: disassembler.c
 	$(CC) -Wall -Wextra -ggdb -o $@ $<
 
-test: tpc test.p fail.p
+tools: tpd tpc tpr
+
+test: tools test.p fail.p
 	./tpc test.p test.out
 	./tpc fail.p fail.out
 
-fib: tpr fib.out
+fib: tools fib.out
 	./tpr fib.out
 
-fib.out: fib.p tpc
+fib.out: fib.p tools
 	./tpc fib.p fib.out
 
-test.out: test.p tpc
+test.out: test.p tools
 	./tpc test.p test.out
 
-dump: tpd test.out
+dump: tools test.out
 	./tpd test.out
 
-tout: tpd tpc tpr
