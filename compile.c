@@ -6,6 +6,9 @@
 
 #include "op-codes.h"
 
+#define UP 1
+#define DOWN -1
+
 enum
 {
   TK_IDENTIFIER=256,
@@ -79,6 +82,7 @@ __attribute__((noreturn)) void die (const char *fmt, ...)
   exit (1);
 }
 
+
 /**
  * Utilities
  *
@@ -86,6 +90,18 @@ __attribute__((noreturn)) void die (const char *fmt, ...)
 void emit (int code)
 {
   fwrite (&code, sizeof (int), 1, output);
+}
+
+int here ()
+{
+  return (int)(ftell (output)/sizeof(int));;
+}
+
+void patch (int addr, int nv)
+{
+  fseek (output, addr*sizeof(int), SEEK_SET);
+  emit (nv);
+  fseek (output, 0, SEEK_END);
 }
 
 /**
@@ -129,8 +145,13 @@ struct var_loc find_var (struct sym_tab *tptr,
   int i;
   for (i=0;tmp != NULL; tmp = tmp->next, i++)
   {
-    if (strcmp (tmp->name, name) == 0)
-      return (struct var_loc){level, i, tmp};
+    if (strcmp (tmp->name, name) == 0) {
+      if (strcmp (name, tptr->name) == 0) {
+        return (struct var_loc){level, 0, tmp};
+      } else {
+        return (struct var_loc){level, i+4, tmp};
+      }
+    }
   }
   if (tptr->parent) {
     return find_var (tptr->parent, name, level + 1);
@@ -669,66 +690,69 @@ void stmt_list ();
 
 void if_stmt ()
 {
+  int out;
   expression ();
   expect(KW_THEN);
+  emit (OP_JZ);
+  int jmp = here ();
+  emit (0);
   printf ("IF\n");
   stmt ();
   if (accept (KW_ELSE))
   {
+    emit (OP_JMP);
+    out = here ();
+    emit (0);
+    patch (jmp, here ());
     printf ("ELSE\n");
     stmt ();
+    patch (out, here ());
+  }
+  else
+  {
+    patch (jmp, here ());
   }
   printf ("ENDIF\n");
 }
 
 void for_stmt ()
 {
-  stmt ();
+  int dir;
+  expect (TK_IDENTIFIER);
+  char *loop_var = strdup (command_buffer);
+  expect (TK_ASSIGN);
+  expression ();
+  
   if (accept (KW_TO))
   {
-    if (accept (TK_IDENTIFIER))
-    {
-      char *ident = strdup (command_buffer);
-      struct var_loc v = find_var (cur_tab, ident, 0);
-      printf ("LOAD %s\n", v.var->name);
-    }
-    else if (accept (TK_NUM))
-    {
-      char *val = strdup (command_buffer);
-      printf ("NUM %s\n", val);
-    }
-    else
-    {
-      die ("Syntax error: bad for loop [1]");
-    }
+    dir = UP;
   }
   else if (accept (KW_DOWNTO))
   {
-    if (accept (TK_IDENTIFIER))
-    {
-      char *ident = strdup (command_buffer);
-      struct var_loc v = find_var (cur_tab, ident, 0);
-      printf ("LOAD %s\n", v.var->name);
-    }
-    else if (accept (TK_NUM))
-    {
-      char *val = strdup (command_buffer);
-      printf ("NUM %s\n", val);
-    }
-    else
-    {
-      die ("Syntax error: bad for loop [2]");
-    }
+    dir = DOWN;
   }
+  else
+  {
+    die ("Expected To or DownTo!");
+  }
+  
+  expression ();
   expect (KW_DO);
   stmt ();
 }
 
 void while_stmt ()
 {
+  int loop = here ();
   expression ();
   expect (KW_DO);
+  emit (OP_JZ);
+  int exit = here ();
+  emit (0);
   stmt ();
+  emit (OP_JMP);
+  emit (loop);
+  patch (exit, here());
 }
 
 void stmt ()
@@ -788,7 +812,7 @@ void var_decls ()
   expect (';');
 }
 
-void block ();
+int block ();
 
 void arg_decls ()
 {
@@ -817,6 +841,7 @@ void fun_decl ()
   add_var (name);
   block ();
   expect (';');
+  emit (OP_RC);
   pop_proc ();
 }
 
@@ -831,27 +856,38 @@ void proc_decl ()
   expect (';');
   block ();
   expect (';');
+  emit (OP_RET);
   pop_proc ();
 }
 
-void block ()
+int block ()
 {  
   if (accept (KW_VAR))
-  {
-    var_decls ();
+  { 
+   var_decls ();
   }
-  while (1) {
-    if (accept (KW_FUNCTION)) {
+  while (1)
+  {
+    if (accept (KW_FUNCTION))
+    {
       fun_decl ();
-    } else if (accept (KW_PROCEDURE)) {
+    }
+    else if (accept (KW_PROCEDURE))
+    {
       proc_decl ();
-    } else {
+    }
+    else
+    {
       break;
     }
   }
   expect (KW_BEGIN);
+  int start = here ();
+  emit (OP_ENT);
+  emit (cur_tab->no_vars);
   stmt_list ();
   expect (KW_END);
+  return start;
 }
 
 void program ()
@@ -862,9 +898,18 @@ void program ()
   printf ("PROG %s\n", command_buffer);
   add_proc (ident);
   expect (';');
-  block ();
+  emit (OP_MST);
+  emit (0);
+  emit (OP_CUP);
+  emit (0);
+  int alku = here ();
+  emit (0);
+  emit (OP_HLT);
+  int start = block ();
+  patch (alku, start);
   expect ('.');
   pop_proc ();
+  emit (OP_RET);
 }
 
 void compile (void)

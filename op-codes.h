@@ -22,7 +22,9 @@ enum op_codes {
   OP_JMP,
   OP_JZ,
   OP_NUM,
-  OP_NEG
+  OP_NEG,
+  OP_RC,
+  OP_HLT
 };
 
   
