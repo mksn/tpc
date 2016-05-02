@@ -1,6 +1,2 @@
-* Create symbol table
-  Map the parameter list into the symbol table
-  contain variables and functions
-  Check against symbol table for each occurence of an identifier or a function if it is a valid function or a variable
-  Check the number of argument of the functions when calling functions.
-  Each block should have its own symbol table, table should also have a pointer to parent's table.
+Add standard functions: WriteLn and ReadLn.
+

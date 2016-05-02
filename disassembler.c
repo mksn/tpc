@@ -10,38 +10,43 @@ void dump (int *code,
   {
     printf ("%05d: ", i);
     int c = code [i++];
-    switch (c) {
-      case OP_MST: {
-        int level = code [i++];
-        printf ("MST %3d\n", level);
+    switch (c)
+    {
+      case OP_MST:
+        {
+          int level = code [i++];
+          printf ("MST %3d\n", level);
+        }
         break;
-      }
-      case OP_CUP: {
-        int no_args = code [i++];
-        int addr = code [i++];
-        printf ("CUP %3d %3d\n", no_args, addr);
+      case OP_CUP:
+        {
+          int no_args = code [i++];
+          int addr = code [i++];
+          printf ("CUP %3d %3d\n", no_args, addr);
+        }
         break;
-      }
-      case OP_ENT: {
-        int foo = code [i++];
-        printf ("ENT %3d\n", foo);
+      case OP_ENT:
+        {
+          int foo = code [i++];
+          printf ("ENT %3d\n", foo);
+        }
         break;
-      }
       case OP_RET:
         printf ("RET\n");
         break;
-      case OP_LD: {
-        int level = code [i++];
-        int addr = code [i++];
-        printf ("LD  %3d %3d\n", level, addr);
+      case OP_LD:
+        {
+          int level = code [i++];
+          int addr = code [i++];
+          printf ("LD  %3d %3d\n", level, addr);
+        }
         break;
-      }
       case OP_ST:
-      {
-        int level = code [i++];
-        int addr = code [i++];
-        printf ("ST  %3d %3d\n", level, addr);
-      }
+        {
+          int level = code [i++];
+          int addr = code [i++];
+          printf ("ST  %3d %3d\n", level, addr);
+        }
         break;
       case OP_ADD:
         printf ("ADD\n");
@@ -86,22 +91,22 @@ void dump (int *code,
         printf ("NOT\n");
         break;
       case OP_JMP:
-      {
-        int addr = code [i++];
-        printf ("JMP %3d\n", addr);
-      }
+        {
+          int addr = code [i++];
+          printf ("JMP %3d\n", addr);
+        }
         break;
       case OP_JZ:
-      {
-        int addr = code [i++];
-        printf ("JZ  %3d\n", addr);
-      }
+        {
+          int addr = code [i++];
+          printf ("JZ  %3d\n", addr);
+        }
         break;
       case OP_NUM:
-      {
-        int no = code [i++];
-        printf ("NUM %3d\n", no);
-      }
+        {
+          int no = code [i++];
+          printf ("NUM %3d\n", no);
+        }
         break;
       case OP_NEG:
         printf ("NEG\n");
@@ -112,7 +117,9 @@ void dump (int *code,
       case OP_HLT:
         printf ("HLT\n");
         break;
-
+      default:
+        printf ("FOO\n");
+        break;
     }
   }
   printf ("[EOF]\n");
