@@ -310,7 +310,6 @@ void factor ()
 
   if (accept(TK_NUM))
   {
-    printf ("NUMBER %g\n", atof(command_buffer));
     emit (OP_NUM);
     emit (atoi (command_buffer));
   }
@@ -335,17 +334,15 @@ void factor ()
       if (f.proc->no_args != n) {
         die ("Wrong number of arguments to function: %s", ident);
       } else {
-        emit (OP_CUP);
+        emit (f.proc->is_std ? OP_CSP : OP_CUP);
         emit (f.proc->no_args);
         emit (f.addr);
-        printf ("CALL %s %d\n", ident, n);
       }
     }
     else
     {
       struct var_loc v;
       // TODO: It might be a procedure call
-      printf ("LOAD %s\n", ident);
       v = find_var (cur_tab, ident, 0);
       emit (OP_LD);
       emit (v.lvl);
@@ -360,7 +357,6 @@ void factor ()
   else if (accept (KW_NOT))
   {
     factor ();
-    printf ("NOT \n");
     emit (OP_NOT);
   }
   else
@@ -375,22 +371,18 @@ void term ()
   {
     if (accept ('*')) {
       factor();
-      printf ("MULT\n");
       emit (OP_MUL);
     }
     else if (accept ('/')){
       factor ();
-      printf ("DIV\n");
       emit (OP_DIV);
     }
     else if (accept (KW_MOD)) {
       factor ();
-      printf ("MOD\n");
       emit (OP_MOD);
     }
     else if (accept (KW_AND)) {
       factor ();
-      printf ("AND\n");
       emit (OP_AND);
     }
     else
@@ -406,7 +398,6 @@ void simple_expression ()
   }
   else if (accept ('-')) {
     term ();
-    printf ("NEG\n");
     emit (OP_NEG);
   }
   else 
@@ -416,17 +407,14 @@ void simple_expression ()
   {
     if (accept ('-')) {
       term();
-      printf ("SUB\n");
       emit (OP_SUB);
     }
     else if (accept ('+')){
       term ();
-      printf ("ADD\n");
       emit (OP_ADD);
     }
     else if (accept (KW_OR)) {
       term ();
-      printf ("OR\n");
       emit (OP_OR);
     }
     else
@@ -441,32 +429,26 @@ void expression ()
   {
     if (accept ('<')) {
       simple_expression ();
-      printf ("LT\n");
       emit (OP_LT);
     }
     else if (accept ('>')){
       term ();
-      printf ("GT\n");
       emit (OP_GT);
     }
     else if (accept (TK_NEQ)) {
       term ();
-      printf ("NEQ\n");
       emit (OP_NEQ);
     }
     else if (accept ('=')) {
       term ();
-      printf ("EQ\n");
       emit (OP_EQ);
     }
     else if (accept (TK_LEQ)) {
       term ();
-      printf ("LEQ\n");
       emit (OP_LEQ);
     }
     else if (accept (TK_GEQ)) {
       term ();
-      printf ("GEQ\n");
       emit (OP_GEQ);
     }
     else
@@ -478,7 +460,6 @@ void assign_stmt (char *ident)
 {
   struct var_loc v;
   expression ();
-  printf ("STORE %s\n", ident);
   v = find_var (cur_tab, ident, 0);
   emit (OP_ST);
   emit (v.lvl);
@@ -498,13 +479,15 @@ void procedure_stmt (char *ident)
     n = arg_list ();
   }
 
-  if (p.proc->no_args != n) {
+  if (p.proc->no_args != n)
+  {
     die ("Wrong number of arguments to procedure: %s", ident);
-  } else {
-    emit (OP_CUP);
+  }
+  else
+  {
+    emit (p.proc->is_std ? OP_CSP : OP_CUP);
     emit (p.proc->no_args);
     emit (p.addr);
-    printf ("PCALL %s %d\n", ident, n);
   }
 }
 
@@ -519,7 +502,6 @@ void if_stmt ()
   emit (OP_JZ);
   int jmp = here ();
   emit (0);
-  printf ("IF\n");
   stmt ();
   if (accept (KW_ELSE))
   {
@@ -527,7 +509,6 @@ void if_stmt ()
     out = here ();
     emit (0);
     patch (jmp, here ());
-    printf ("ELSE\n");
     stmt ();
     patch (out, here ());
   }
@@ -535,7 +516,6 @@ void if_stmt ()
   {
     patch (jmp, here ());
   }
-  printf ("ENDIF\n");
 }
 
 void for_stmt ()
@@ -543,6 +523,7 @@ void for_stmt ()
   int dir;
   expect (TK_IDENTIFIER);
   char *loop_var = strdup (command_buffer);
+  add_var (loop_var);
   expect (TK_ASSIGN);
   expression ();
   
@@ -562,8 +543,19 @@ void for_stmt ()
   expression ();
   expect (KW_DO);
   stmt ();
+  if (dir) {;}
 }
 
+void repeat_stmt ()
+{
+  int loop = here ();
+  stmt_list ();
+  expect (KW_UNTIL);
+  expression ();
+  emit (OP_JZ);
+  emit (loop);
+}
+    
 void while_stmt ()
 {
   int loop = here ();
@@ -610,7 +602,12 @@ void stmt ()
   {
     while_stmt ();
   }
+  else if (accept (KW_REPEAT))
+  {
+    repeat_stmt ();
+  }
 }
+
 
 void stmt_list ()
 {
@@ -720,7 +717,6 @@ void program ()
   expect (KW_PROGRAM);
   expect (TK_IDENTIFIER);
   char *ident = strdup (command_buffer);
-  printf ("PROG %s\n", command_buffer);
   add_proc (ident);
   expect (';');
   emit (OP_MST);

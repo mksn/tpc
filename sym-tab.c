@@ -7,16 +7,33 @@ struct sym_tab *table;
 struct sym_tab *cur_tab;
 struct sym_var *cur_var;
 
-extern void die (const char *fmt, ...);
+__attribute__((noreturn)) extern void die (const char *fmt, ...);
+
+void insert_standard_procedures ()
+{
+  int i;
+
+  for (i=0; std_procs [i].name != NULL; i++)
+  {
+    add_proc (std_procs [i].name);
+    if (std_procs [i].return_type)
+      cur_tab->return_type = strdup(std_procs [i].return_type);
+    cur_tab->no_args = std_procs [i].no_args;
+    cur_tab->no_vars = std_procs [i].no_vars;
+    cur_tab->addr = i;
+    cur_tab->is_std = 1;
+    pop_proc ();
+  }
+}
 
 void
 prepare_symbol_table ()
 {
   table = malloc (sizeof (struct sym_tab));
   memset (table, 0, sizeof (struct sym_tab));
-  cur_tab = NULL;
+  cur_tab = table;
   insert_standard_procedures (table);
-};
+}
 
 struct var_loc find_var (struct sym_tab *tptr,
                          char *name,
@@ -117,6 +134,7 @@ void add_proc (char *name)
 void pop_proc ()
 {
   cur_tab = cur_tab->parent;
+  cur_var = cur_tab->vars;
 }
 
 struct sym_var *new_var ()
@@ -158,32 +176,30 @@ void add_var (char *name)
 
 void print_var (struct sym_var *v)
 {
-  printf ("Name: %s", v->name);
+  printf (", Name: %s", v->name);
   if (v->type) 
   {
     printf (", type: %s", v->type);
   }
-  printf ("\n");
 }
 
 void print_proc (struct sym_tab *t)
 {
-  struct sym_var *v = t->vars;
-  printf ("[proc: %s, no_vars: %d, no_args: %d\n", t->name, t->no_vars, t->no_args);
-  for (;v != NULL; v = v->next)
+  for (;t!=NULL; t=t->next)
   {
-    print_var (v);
+    struct sym_var *v = t->vars;
+    printf ("\n[proc: %s, no_vars: %d, no_args: %d", t->name, t->no_vars, t->no_args);
+    for (;v != NULL; v = v->next)
+    {
+      print_var (v);
+    }
+    if (t->child)
+      print_proc (t->child);
+    printf ("]");
   }
-  if (t->child)
-    print_proc (t->child);
-  printf ("]\n");
 }
 
 void print_sym_tab ()
 {
-  struct sym_tab *t = table;
-  for (;t!=NULL; t=t->next) 
-  {
-    print_proc (t);
-  }
+  print_proc (table);
 }

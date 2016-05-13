@@ -4,20 +4,20 @@ TPC_OBJS := compile.o \
 						sym-tab.o \
 						std-procs.o 
 
-TPR_OBJS := run.o
+TPR_OBJS := run.o std-procs.o
 
-TPD_OBJS := disassembler.o
+TPD_OBJS := disassembler.o std-procs.o 
 
-tpc: $(TPC_OBJS)
-	$(CC) -Wall -Wextra -ggdb -o tpc $(TPC_OBJS)
+tpc: $(TPC_OBJS) 
+	$(CC) -Wall -Wextra -ggdb -o $@ $^
 
-tpr: run.c op-codes.h
-	$(CC) -Wall -Wextra -ggdb -o $@ $<
+tpr: $(TPR_OBJS)
+	$(CC) -Wall -Wextra -ggdb -o $@ $^
 
-tpd: disassembler.c op-codes.h
-	$(CC) -Wall -Wextra -ggdb -o $@ $<
+tpd: $(TPD_OBJS)
+	$(CC) -Wall -Wextra -ggdb -o $@ $^
 
-.c.o:
+.c.o: op-codes.h sym-tab.h std-procs.h
 	$(CC) -Wall -Wextra -ggdb -c $<
 
 

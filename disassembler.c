@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "op-codes.h"
+#include "std-procs.h"
 
 void dump (int *code,
            int n)
@@ -23,6 +24,13 @@ void dump (int *code,
           int no_args = code [i++];
           int addr = code [i++];
           printf ("CUP %3d %3d\n", no_args, addr);
+        }
+        break;
+      case OP_CSP:
+        {
+          int no_args = code [i++];
+          int addr = code [i++];
+          printf ("CSP %d %s\n", no_args, std_procs [addr].name);
         }
         break;
       case OP_ENT:

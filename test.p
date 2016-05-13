@@ -19,6 +19,12 @@ begin
    for g := 1 to 5 do
       h := g*h;
   c := h;
+
+   repeat
+      begin
+         h :=h*2;
+      end
+   until h < 1024
 end;
 
 begin

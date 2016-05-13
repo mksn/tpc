@@ -1,4 +1,6 @@
 program main;
+var i;
+
 function fib (n) : foo;
 begin
    if  n = 0
@@ -11,5 +13,17 @@ begin
 end;
 
 begin
-   fib (5)
+  i := 1;
+  repeat
+    WriteLn (i);
+   WriteLn (fib (i));
+   i := i + 1
+  until i = 10;
+  i := 1;
+  while i<10 do
+    begin
+      WriteLn (i);
+      WriteLn (fib (i));
+      i := i + 1
+    end
 end.

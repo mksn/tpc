@@ -13,8 +13,10 @@ struct std_proc
 };
 
 extern struct std_proc std_procs [];
+extern void WriteLn (int i);
+extern int ReadLn ();
 
 void write_line (const char *line);
-void insert_standard_procedures (struct sym_tab *t);
+void insert_standard_procedures ();
 
 #endif

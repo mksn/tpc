@@ -17,7 +17,9 @@ struct sym_tab {
   int            addr;
   int            no_args;
   int            no_vars;
+  int            is_std;
   struct sym_var *vars;
+
   struct sym_tab *child;
   struct sym_tab *parent;
   struct sym_tab *next;
