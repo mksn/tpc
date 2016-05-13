@@ -1,0 +1,3 @@
+function mika();
+begin
+end;
