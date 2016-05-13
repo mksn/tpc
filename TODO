@@ -1,8 +1,8 @@
 Add type support: start with basics; Integer, Real and Char.
-Add support for arrays, string and records.
+Add support for arrays, strings and records.
 Add support for sets and pointers.
 Add for loops.
 Add comments.
 Add subranges.
 Add enums.
-
+Add true WriteLn and ReadLn functionality; varargs, of sorts.
