@@ -52,3 +52,6 @@ clean:
 	$(RM) tpd
 	$(RM) tpc
 	$(RM) *.o{,~}
+
+tags:
+	etags -c *.c
